@@ -1,0 +1,35 @@
+name: Run notebooks and build figures
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write   # lets the workflow commit the regenerated figures
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Smoke-test the NSGA-II module
+        run: python src/nsga2.py
+      - name: Build README figures
+        run: python src/make_figures.py
+      - name: Execute notebooks end to end
+        working-directory: notebooks
+        run: |
+          jupyter nbconvert --to notebook --execute multiobjective_activity.ipynb --output /tmp/activity_out.ipynb
+          jupyter nbconvert --to notebook --execute my_investigations.ipynb --output /tmp/investigations_out.ipynb
+      - name: Commit figures if they changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add figures
+          git diff --cached --quiet || (git commit -m "Update figures [workflow]" && git push)
